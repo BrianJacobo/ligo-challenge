@@ -19,6 +19,10 @@ describe('CashInService — resilience to infrastructure failures', () => {
   async function buildService(overrides: {
     repository?: Partial<Record<keyof CashInOperationRepository, jest.Mock>>;
     lockService?: Partial<Record<keyof IdempotencyLockService, jest.Mock>>;
+    transitionResult?: {
+      operation: unknown;
+      balanceAfterCredit: number | null;
+    };
   }) {
     const repository = {
       findByIdempotencyKey: jest.fn().mockResolvedValue(null),
@@ -44,7 +48,16 @@ describe('CashInService — resilience to infrastructure failures', () => {
       buffer: jest.fn(),
     };
 
-    const transitionService = { resolve: jest.fn() };
+    // Mirrors the real OperationTransitionService contract: the transitioned
+    // operation plus the balance $inc returned atomically at credit time.
+    const transitionService = {
+      resolve: jest.fn().mockResolvedValue(
+        overrides.transitionResult ?? {
+          operation: null,
+          balanceAfterCredit: null,
+        },
+      ),
+    };
 
     const paymentProvider = {
       charge: jest
@@ -108,6 +121,10 @@ describe('CashInService — resilience to infrastructure failures', () => {
       },
       repository: {
         insertPending: jest.fn().mockResolvedValue(insertedOperation),
+      },
+      transitionResult: {
+        operation: { ...insertedOperation, status: 'completed' },
+        balanceAfterCredit: 100,
       },
     });
 

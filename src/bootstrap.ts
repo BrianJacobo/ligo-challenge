@@ -5,6 +5,11 @@ import {
   CashInOperation,
   CashInOperationDocument,
 } from './cash-in/schemas/cash-in-operation.schema';
+import { Wallet, WalletDocument } from './wallet/schemas/wallet.schema';
+import {
+  PendingWebhook,
+  PendingWebhookDocument,
+} from './webhooks/schemas/pending-webhook.schema';
 import { CorrelationIdInterceptor } from './common/interceptors/correlation-id.interceptor';
 
 /**
@@ -29,9 +34,17 @@ export async function configureApp(app: INestApplication): Promise<void> {
   // Mongoose builds indexes in the background on connect and does NOT block
   // writes on them by default. The unique index on idempotencyKey is the
   // final guarantee against double-charging, so this pod must not accept
-  // traffic until it's confirmed to exist.
-  const cashInModel = app.get<Model<CashInOperationDocument>>(
-    getModelToken(CashInOperation.name),
-  );
-  await cashInModel.ensureIndexes();
+  // traffic until every unique index used by the domain is confirmed to exist
+  // — not just the cash-in one, since Wallet.userId and
+  // PendingWebhook.operationId are also relied upon for correctness (single
+  // wallet per user, single buffered webhook per operation).
+  const modelsToVerify: Model<unknown>[] = [
+    app.get<Model<CashInOperationDocument>>(
+      getModelToken(CashInOperation.name),
+    ),
+    app.get<Model<WalletDocument>>(getModelToken(Wallet.name)),
+    app.get<Model<PendingWebhookDocument>>(getModelToken(PendingWebhook.name)),
+  ];
+
+  await Promise.all(modelsToVerify.map((model) => model.ensureIndexes()));
 }

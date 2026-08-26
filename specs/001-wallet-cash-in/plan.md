@@ -318,3 +318,45 @@ determinísticos de cada rama, sin `Math.random` como único mecanismo.
 - Transacciones multi-documento de Mongo (session/transaction) — se evalúa si el
   tiempo alcanza; si no, se documenta como mejora futura (el update condicional +
   índice único ya cubre los casos de test requeridos sin transacciones explícitas).
+- **Cola de mensajes (RabbitMQ/SQS/Pub-Sub)**: evaluada y descartada para este
+  alcance. El buffer de `pending_webhooks` resuelve la única ventana de carrera
+  real (webhook antes que el insert) sin la complejidad operacional de un broker
+  adicional. Dónde sí encajaría: desacoplar `POST /webhooks/payment` de la
+  transición síncrona (publicar evento, consumir aparte), la reconciliación de
+  operaciones `pending` mencionada arriba, o un outbox pattern si se necesitara
+  publicar "wallet credited" a otros servicios de forma transaccional.
+
+## Auditoría post-Fase 9
+
+Tras cerrar las 9 fases, se pidió una revisión adicional exhaustiva. Se encontraron
+5 hallazgos nuevos, no vistos por los tests ni por la revisión de la Fase 9:
+
+1. **[Corregido] `new_balance` podía reportar un valor no correspondiente a la
+   propia operación bajo concurrencia real.** `OperationTransitionService.resolve()`
+   descartaba el balance exacto que el `$inc` atómico ya había devuelto, y
+   `CashInService` hacía una segunda lectura (`getBalance()`) separada — que en
+   teoría podía correr después de que otra operación concurrente del mismo
+   usuario alterara el balance. El balance en Mongo siempre fue correcto; el
+   valor *reportado en la respuesta HTTP* podía no ser el de esta operación.
+   Corregido: `resolve()` ahora retorna `{ operation, balanceAfterCredit }`, y
+   `CashInService` usa ese valor directamente en vez de releer, cayendo a
+   `getBalance()` solo cuando no hubo crédito (fallo o no-op). Test:
+   `operation-transition.service.spec.ts` con dos créditos concurrentes reales
+   contra Mongo.
+2. **[Documentado, no corregido] El test de "Redis caído" no ejercita el
+   comportamiento real de `ioredis` ante una conexión inalcanzable** — mockea que
+   `acquire()` rechaza inmediatamente, pero el cliente real con configuración
+   default puede reintentar en vez de fallar rápido. Riesgo real: la lógica de
+   "degradar sin lock" asume una excepción rápida. Mitigación futura: configurar
+   `maxRetriesPerRequest` bajo o un timeout explícito en `redis-client.provider.ts`.
+3. **[Corregido] `pending_webhooks` sin límite de vida.** Se agregó un índice TTL
+   de 24h sobre `receivedAt` (`schemas/pending-webhook.schema.ts`) — un webhook
+   para una operación que nunca se crea ya no queda huérfano indefinidamente.
+4. **[Corregido] `ensureIndexes()` en el bootstrap solo cubría `CashInOperation`.**
+   Se extendió `src/bootstrap.ts` para esperar también los índices de `Wallet` y
+   `PendingWebhook` antes de aceptar tráfico.
+5. **[Corregido] Un test de Redis (`idempotency-lock.service.spec.ts`) usaba
+   `flushdb()` sobre la DB 0 compartida, sin aislamiento por archivo/worker** —
+   inconsistente con el resto de la suite. Se movió a un rango de DBs lógicas
+   dedicado (10+índice de worker) y se reemplazó `flushdb()` por borrado
+   selectivo de sus propias keys.

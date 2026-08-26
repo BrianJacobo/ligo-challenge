@@ -16,7 +16,10 @@ import {
   CashInOperationRepository,
   DuplicateIdempotencyKeyError,
 } from './cash-in-operation.repository';
-import { OperationTransitionService } from './operation-transition.service';
+import {
+  OperationTransitionService,
+  TransitionResult,
+} from './operation-transition.service';
 import { PendingWebhookRepository } from '../webhooks/pending-webhook.repository';
 import { CashInOperationDocument } from './schemas/cash-in-operation.schema';
 import { CreateCashInDto } from './dto/create-cash-in.dto';
@@ -173,7 +176,7 @@ export class CashInService {
     this.logger.log(
       `Applying webhook that arrived before operation ${operation.operationId} existed`,
     );
-    const updated = await this.transitionService.resolve(
+    const transition = await this.transitionService.resolve(
       operation.operationId,
       dto.user_id,
       dto.amount,
@@ -181,8 +184,8 @@ export class CashInService {
       buffered.providerReference,
     );
 
-    const balance = await this.walletService.getBalance(dto.user_id);
-    return this.toResponseDto(updated ?? operation, balance);
+    const balance = await this.resolveBalanceToReport(transition, dto.user_id);
+    return this.toResponseDto(transition?.operation ?? operation, balance);
   }
 
   private async chargeAndResolve(
@@ -201,15 +204,18 @@ export class CashInService {
       );
 
       const newStatus = result.outcome === 'success' ? 'completed' : 'failed';
-      const updated = await this.transitionService.resolve(
+      const transition = await this.transitionService.resolve(
         operation.operationId,
         dto.user_id,
         dto.amount,
         newStatus,
         result.providerReference ?? null,
       );
-      const balance = await this.walletService.getBalance(dto.user_id);
-      return this.toResponseDto(updated ?? operation, balance);
+      const balance = await this.resolveBalanceToReport(
+        transition,
+        dto.user_id,
+      );
+      return this.toResponseDto(transition?.operation ?? operation, balance);
     } catch (error) {
       if (error instanceof PaymentProviderTimeoutError) {
         this.logger.warn(
@@ -260,6 +266,25 @@ export class CashInService {
     }
 
     throw new OperationInProgressException();
+  }
+
+  /**
+   * When the transition credited the wallet, use the balance $inc returned
+   * atomically at credit time — not a separate read afterwards, which could
+   * race with another concurrent operation on the same wallet and report a
+   * value from a different moment than the one just credited.
+   */
+  private async resolveBalanceToReport(
+    transition: TransitionResult | null,
+    userId: string,
+  ): Promise<number> {
+    if (
+      transition?.balanceAfterCredit !== null &&
+      transition?.balanceAfterCredit !== undefined
+    ) {
+      return transition.balanceAfterCredit;
+    }
+    return this.walletService.getBalance(userId);
   }
 
   private toResponseDto(

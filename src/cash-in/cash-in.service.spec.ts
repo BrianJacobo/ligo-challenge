@@ -58,9 +58,10 @@ describe('CashInService — early webhook drain', () => {
     };
 
     const transitionService = {
-      resolve: jest
-        .fn()
-        .mockResolvedValue({ ...insertedOperation, status: 'completed' }),
+      resolve: jest.fn().mockResolvedValue({
+        operation: { ...insertedOperation, status: 'completed' },
+        balanceAfterCredit: 200,
+      }),
     };
 
     const paymentProvider = { charge: jest.fn() };
@@ -137,7 +138,10 @@ describe('CashInService — early webhook drain', () => {
     };
 
     const transitionService = {
-      resolve: jest.fn().mockResolvedValue(insertedOperation),
+      resolve: jest.fn().mockResolvedValue({
+        operation: insertedOperation,
+        balanceAfterCredit: 100,
+      }),
     };
 
     const paymentProvider = {

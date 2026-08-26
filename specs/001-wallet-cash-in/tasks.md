@@ -197,3 +197,28 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
       directamente). Se corrigió `npm run lint` a 0 errores/0 warnings (antes:
       11 errores, 24 warnings — tipos `any` sin acotar en tests e2e, un floating
       promise en `main.ts`).
+
+## Auditoría post-Fase 9 (a pedido del usuario)
+
+Con las 9 fases cerradas, se pidió una segunda pasada exhaustiva por un agente
+en fork, dedicado solo a buscar discrepancias entre lo documentado y el código
+real. Ver `plan.md` sección "Auditoría post-Fase 9" para el detalle técnico.
+
+- [x] Corregido: `new_balance` podía no reflejar el balance de la propia
+      operación bajo concurrencia real (se descartaba el resultado del `$inc`
+      atómico y se releía por separado). `OperationTransitionService.resolve()`
+      ahora retorna `{ operation, balanceAfterCredit }`.
+- [x] Corregido: `pending_webhooks` sin TTL — se agregó expiración de 24h.
+- [x] Corregido: `ensureIndexes()` del bootstrap solo cubría `CashInOperation`,
+      ahora cubre también `Wallet` y `PendingWebhook`.
+- [x] Corregido: test de Redis (`idempotency-lock.service.spec.ts`) usaba
+      `flushdb()` sobre la DB compartida sin aislamiento por worker — ahora usa
+      un rango de DBs dedicado y borrado selectivo.
+- [x] Documentado (no corregido, riesgo aceptado): el test de "Redis caído" no
+      ejercita el comportamiento real de `ioredis` ante una conexión
+      inalcanzable, solo un mock que rechaza inmediato.
+- [x] Se agregaron 2 tests nuevos en `operation-transition.service.spec.ts`
+      (contra Mongo real, con créditos concurrentes genuinos) para el primer
+      hallazgo.
+- [x] Verificado: build limpio, lint 0/0, 28 unit tests (+2 desde la Fase 9) +
+      16 e2e tests, estables en corridas repetidas.

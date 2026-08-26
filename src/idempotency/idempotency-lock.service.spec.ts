@@ -1,7 +1,13 @@
 import Redis from 'ioredis';
 import { IdempotencyLockService } from './idempotency-lock.service';
 
-const REDIS_URL = process.env.REDIS_URL_TEST ?? 'redis://localhost:6379';
+// Uses its own Redis logical DB (like test/setup-e2e-env.ts does for e2e) so
+// this suite's cleanup never touches keys another test file or a developer's
+// manual session might be using on DB 0.
+const workerId = process.env.JEST_WORKER_ID ?? '0';
+const REDIS_URL =
+  process.env.REDIS_URL_TEST ??
+  `redis://localhost:6379/${10 + Number(workerId)}`;
 
 describe('IdempotencyLockService', () => {
   let redis: Redis;
@@ -13,7 +19,11 @@ describe('IdempotencyLockService', () => {
   });
 
   afterEach(async () => {
-    await redis.flushdb();
+    // Delete only the keys this suite created, not the whole logical DB.
+    const keys = await redis.keys('idempotency:key-*');
+    if (keys.length > 0) {
+      await redis.del(...keys);
+    }
   });
 
   afterAll(async () => {
