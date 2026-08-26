@@ -138,23 +138,23 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 
 ## Fase 8 — README
 
-- [ ] T8.1: Sección "Arquitectura" con diagrama simple (puede ser ASCII, igual al de
+- [x] T8.1: Sección "Arquitectura" con diagrama simple (puede ser ASCII, igual al de
       plan.md).
-- [ ] T8.2: Sección "Estrategia de idempotencia" — explicar por qué Mongo (índice
+- [x] T8.2: Sección "Estrategia de idempotencia" — explicar por qué Mongo (índice
       único) es la fuente de verdad y Redis es optimización, no garantía.
-- [ ] T8.3: Sección "Manejo de concurrencia" — lock Redis + `$inc` atómico de balance.
-- [ ] T8.4: Sección "Estrategia de retry" — qué es seguro reintentar (todo, gracias a
+- [x] T8.3: Sección "Manejo de concurrencia" — lock Redis + `$inc` atómico de balance.
+- [x] T8.4: Sección "Estrategia de retry" — qué es seguro reintentar (todo, gracias a
       idempotencia) y qué código/mensaje debe usar el cliente ante timeout.
-- [ ] T8.5: Sección "Manejo de webhooks" — duplicados, fuera de orden, llegada
-      temprana; incluir la limitación documentada de T5.2 si no se implementó buffer
-      completo.
-- [ ] T8.6: **Sección obligatoria "Uso del agente de IA"** — qué prompts/specs se
-      dieron (referenciar este mismo spec.md/plan.md), qué generó el agente
-      correctamente, y qué se tuvo que corregir manualmente (ser específico: ej.
-      "el agente propuso idempotencia solo con una Map en memoria, se corrigió a
-      índice único de Mongo + lock Redis porque no sobrevive a multi-pod").
-- [ ] T8.7: Instrucciones de setup y ejecución (`docker-compose up`, `npm install`,
-      `npm run start:dev`, `npm test`).
+- [x] T8.5: Sección "Manejo de webhooks" — duplicados, fuera de orden, llegada
+      temprana (con buffer real implementado, no la versión simplificada).
+- [x] T8.6: **Sección obligatoria "Uso del agente de IA"** — decisiones tomadas
+      antes de codear, qué generó bien el agente sin corrección, y los 4 bugs
+      reales encontrados y corregidos durante el desarrollo (uuid ESM-only,
+      índice único no garantizado al arrancar, aislamiento de tests entre
+      archivos, desincronización entre main.ts y el helper de tests e2e).
+- [x] T8.7: Instrucciones de setup y ejecución (`docker compose up`, `npm install`,
+      `npm run start:dev`, `npm test`, `npm run test:e2e`), verificadas
+      manualmente con curl contra los 3 métodos de pago del mock.
 
 ## Fase 9 — Revisión final
 
