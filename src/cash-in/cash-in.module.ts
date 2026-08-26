@@ -4,9 +4,11 @@ import { CashInOperation, CashInOperationSchema } from './schemas/cash-in-operat
 import { CashInOperationRepository } from './cash-in-operation.repository';
 import { CashInController } from './cash-in.controller';
 import { CashInService } from './cash-in.service';
+import { OperationTransitionService } from './operation-transition.service';
 import { IdempotencyModule } from '../idempotency/idempotency.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { PaymentProviderModule } from '../payment-provider/payment-provider.module';
+import { PendingWebhookModule } from '../webhooks/pending-webhook.module';
 
 @Module({
   imports: [
@@ -16,9 +18,10 @@ import { PaymentProviderModule } from '../payment-provider/payment-provider.modu
     IdempotencyModule,
     WalletModule,
     PaymentProviderModule,
+    PendingWebhookModule,
   ],
   controllers: [CashInController],
-  providers: [CashInOperationRepository, CashInService],
-  exports: [CashInOperationRepository],
+  providers: [CashInOperationRepository, CashInService, OperationTransitionService],
+  exports: [CashInOperationRepository, OperationTransitionService],
 })
 export class CashInModule {}

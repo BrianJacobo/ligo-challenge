@@ -125,6 +125,15 @@ debe aceptar tráfico sin esa protección activa. Esto se detectó como un test 
 (el índice único a veces "no aplicaba" en la primera escritura de un proceso recién
 conectado) y se corrigió tanto en el arranque real como en los tests.
 
+**Nota de aislamiento de tests:** Jest corre cada archivo de test (unit y e2e) como
+un worker separado, en paralelo. Si dos archivos apuntan a la misma base de Mongo
+(o el mismo Redis DB), el `afterEach`/`afterAll` de uno (`deleteMany`,
+`dropDatabase`, `flushdb`) puede borrar datos o índices que otro archivo todavía
+necesita a mitad de su ejecución — esto causó fallos intermitentes reales (no
+hipotéticos) tanto en los tests unitarios de la Fase 1/3 como en los e2e de la
+Fase 4/5. La solución: cada archivo usa su propia base de datos (sufijo por nombre
+de archivo en unit tests, por `JEST_WORKER_ID` en e2e vía `test/setup-e2e-env.ts`).
+
 ### `wallets`
 
 ```ts
@@ -133,6 +142,21 @@ conectado) y se corrigió tanto en el arranque real como en los tests.
   userId: string,       // unique
   balance: number,       // actualizado solo vía $inc atómico
   updatedAt: Date,
+}
+```
+
+### `pending_webhooks`
+
+Buffer temporal para webhooks que llegan antes de que exista la operación
+correspondiente (ver "Flujo: POST /webhooks/payment", paso 3).
+
+```ts
+{
+  _id: ObjectId,
+  operationId: string,   // UNIQUE INDEX — upsert por reenvíos del mismo webhook
+  status: "completed" | "failed",
+  providerReference: string | null,
+  receivedAt: Date,
 }
 ```
 
@@ -194,18 +218,23 @@ Reglas:
 ## Flujo: POST /webhooks/payment
 
 1. Buscar operación por `operationId`.
-   - No existe todavía (webhook llegó antes que el insert del paso 4b de arriba):
-     guardar el webhook en una colección de buffer `pending_webhooks` con
-     `operationId` y reintentarlo vía un job corto (o, más simple para el alcance
-     de 3-4h: responder `200` igual y loguear; un proceso de reconciliación fuera
-     de alcance se encargaría en producción real — **documentar esto como decisión
-     consciente, no como omisión**).
-   - Existe: aplicar el mismo **update condicional** `status: "pending" → newStatus`
-     descrito en la máquina de estados. Si no matchea (ya estaba `completed`/`failed`),
-     es un no-op idempotente → responder `200 OK` igual.
+   - **No existe todavía** (webhook llegó antes que el insert del paso 4b del flujo
+     de cash-in): se guarda el webhook en la colección de buffer `pending_webhooks`
+     (`{ operationId, status, providerReference, receivedAt }`, upsert por
+     `operationId` para tolerar reenvíos) y se responde `200 OK`. No se lanza
+     excepción — es un caso esperado, no un error.
+   - **Existe**: aplicar el mismo **update condicional** `status: "pending" →
+     newStatus` descrito en la máquina de estados. Si no matchea (ya estaba
+     `completed`/`failed`), es un no-op idempotente → responder `200 OK` igual.
 2. Si la transición fue efectiva y el nuevo estado es `completed`, ejecutar el
    `$inc` de balance (mismo código que el flujo síncrono, reutilizado — nunca
    acreditar dos veces gracias al update condicional).
+3. **Drenado del buffer**: justo después de `insertPending()` en el flujo de
+   cash-in (paso 4b), se consulta `pending_webhooks` por ese `operationId`; si hay
+   uno bufferizado, se aplica inmediatamente (mismo update condicional) y se borra
+   del buffer. Esto cierra la ventana de carrera sin necesitar un job en segundo
+   plano ni polling — el propio flujo de cash-in "recoge" el webhook que llegó
+   temprano en cuanto la operación existe.
 
 ## Concurrencia sobre el saldo (RNF2)
 

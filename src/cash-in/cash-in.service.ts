@@ -9,6 +9,8 @@ import type { PaymentProvider } from '../payment-provider/payment-provider.inter
 import { IdempotencyLockService } from '../idempotency/idempotency-lock.service';
 import { WalletService } from '../wallet/wallet.service';
 import { CashInOperationRepository } from './cash-in-operation.repository';
+import { OperationTransitionService } from './operation-transition.service';
+import { PendingWebhookRepository } from '../webhooks/pending-webhook.repository';
 import { CashInOperationDocument } from './schemas/cash-in-operation.schema';
 import { CreateCashInDto } from './dto/create-cash-in.dto';
 import { CashInResponseDto } from './dto/cash-in-response.dto';
@@ -47,6 +49,8 @@ export class CashInService {
     private readonly repository: CashInOperationRepository,
     private readonly lockService: IdempotencyLockService,
     private readonly walletService: WalletService,
+    private readonly transitionService: OperationTransitionService,
+    private readonly pendingWebhookRepository: PendingWebhookRepository,
     @Inject(PAYMENT_PROVIDER) private readonly paymentProvider: PaymentProvider,
   ) {}
 
@@ -92,10 +96,44 @@ export class CashInService {
         return this.resolveExisting(raced, requestHash);
       }
 
+      // The operation now exists — if a webhook arrived earlier and was buffered
+      // (see plan.md "Flujo: POST /webhooks/payment", paso 3), apply it now
+      // instead of racing the payment provider call below.
+      const bufferedResult = await this.applyBufferedWebhookIfAny(operation, dto);
+      if (bufferedResult) {
+        return bufferedResult;
+      }
+
       return await this.chargeAndResolve(operation, dto);
     } finally {
       await this.lockService.release(lock);
     }
+  }
+
+  private async applyBufferedWebhookIfAny(
+    operation: CashInOperationDocument,
+    dto: CreateCashInDto,
+  ): Promise<CashInResponseDto | null> {
+    const buffered = await this.pendingWebhookRepository.takeByOperationId(
+      operation.operationId,
+    );
+    if (!buffered) {
+      return null;
+    }
+
+    this.logger.log(
+      `Applying webhook that arrived before operation ${operation.operationId} existed`,
+    );
+    const updated = await this.transitionService.resolve(
+      operation.operationId,
+      dto.user_id,
+      dto.amount,
+      buffered.status,
+      buffered.providerReference,
+    );
+
+    const balance = await this.walletService.getBalance(dto.user_id);
+    return this.toResponseDto(updated ?? operation, balance);
   }
 
   private async chargeAndResolve(
@@ -109,24 +147,13 @@ export class CashInService {
         paymentMethod: dto.payment_method,
       });
 
-      if (result.outcome === 'success') {
-        const updated = await this.repository.updateStatusIfPending(
-          operation.operationId,
-          'completed',
-          result.providerReference ?? null,
-        );
-        const newBalance = await this.walletService.creditBalance(
-          dto.user_id,
-          dto.amount,
-        );
-        return this.toResponseDto(updated ?? operation, newBalance);
-      }
-
-      // Explicit failure — never touch the balance.
-      const updated = await this.repository.updateStatusIfPending(
+      const newStatus = result.outcome === 'success' ? 'completed' : 'failed';
+      const updated = await this.transitionService.resolve(
         operation.operationId,
-        'failed',
-        null,
+        dto.user_id,
+        dto.amount,
+        newStatus,
+        result.providerReference ?? null,
       );
       const balance = await this.walletService.getBalance(dto.user_id);
       return this.toResponseDto(updated ?? operation, balance);

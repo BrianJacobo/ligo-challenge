@@ -7,6 +7,7 @@ import { CashInModule } from './cash-in/cash-in.module';
 import { WalletModule } from './wallet/wallet.module';
 import { PaymentProviderModule } from './payment-provider/payment-provider.module';
 import { IdempotencyModule } from './idempotency/idempotency.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { IdempotencyModule } from './idempotency/idempotency.module';
     WalletModule,
     PaymentProviderModule,
     IdempotencyModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -79,16 +79,22 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 
 ## Fase 5 — POST /webhooks/payment
 
-- [ ] T5.1: `PaymentWebhookDto` con validación.
-- [ ] T5.2: Implementar `WebhooksService.handlePaymentWebhook()`:
-      - Operación no encontrada → estrategia definida en plan.md (buffer o log +
-        200), documentar la elección en el README.
-      - Operación encontrada → `updateStatusIfPending`; si no matchea (ya terminal),
-        no-op idempotente, responder 200.
-      - Si transición efectiva a `completed` → acreditar balance (reusar
-        `WalletService.creditBalance`).
-- [ ] T5.3: Verificar explícitamente que un webhook `failed` no puede sobreescribir
-      un estado `completed` ya alcanzado (y viceversa).
+- [x] T5.1: `PaymentWebhookDto` con validación.
+- [x] T5.2: Implementar `WebhooksService.handlePaymentWebhook()`:
+      - Operación no encontrada → se elige la opción de **buffer real** (colección
+        `pending_webhooks`, upsert por `operationId`), no solo log + 200: más
+        robusto y con poco costo extra. `CashInService` drena el buffer justo
+        después de `insertPending()`, evitando polling o jobs en background.
+      - Operación encontrada → `OperationTransitionService.resolve()` (que envuelve
+        `updateStatusIfPending`); si no matchea (ya terminal), no-op idempotente,
+        responde 200 igual.
+      - Si transición efectiva a `completed` → acredita balance, vía el mismo
+        `OperationTransitionService` compartido con el flujo síncrono de cash-in
+        (evita duplicar la regla "solo acreditar en transición efectiva" en dos
+        lugares).
+- [x] T5.3: Verificar explícitamente que un webhook `failed` no puede sobreescribir
+      un estado `completed` ya alcanzado (y viceversa). Cubierto en
+      `webhooks.e2e-spec.ts` ("does not let an out-of-order failed overwrite...").
 
 ## Fase 6 — Observabilidad
 
@@ -112,14 +118,19 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 - [x] T7.5: E2E — `payment_method: "card_force_timeout"` → operación queda `pending`,
       balance no se altera (se agregó también el caso `card_force_failure` → `failed`,
       balance no se altera).
-- [ ] T7.6: E2E — Webhook duplicado (enviar el mismo payload de webhook 2 veces) →
+- [x] T7.6: E2E — Webhook duplicado (enviar el mismo payload de webhook 2 veces) →
       balance acreditado una sola vez.
-- [ ] T7.7: E2E — Webhook fuera de orden (`failed` enviado después de que la
+- [x] T7.7: E2E — Webhook fuera de orden (`failed` enviado después de que la
       operación ya está `completed`) → estado permanece `completed`.
-- [ ] T7.8: E2E — Webhook llega para un `operationId` que aún no existe en Mongo →
-      no lanza excepción no controlada, comportamiento documentado se cumple.
-- [ ] T7.9: Correr `npm test` y `npm run test:e2e` limpio (sin tests skip, sin
-      console.error de errores no esperados).
+- [x] T7.8: E2E — Webhook llega para un `operationId` que aún no existe en Mongo →
+      no lanza excepción no controlada, se bufferiza en `pending_webhooks` y
+      responde 200. El drenado del buffer al insertar la operación se prueba por
+      separado en `cash-in.service.spec.ts` (unit, con mocks) porque solo ahí se
+      puede forzar de forma determinista que el webhook exista *antes* del insert.
+- [x] T7.9: Correr `npm test` y `npm run test:e2e` limpio (sin tests skip, sin
+      console.error de errores no esperados). Verificado con 5 corridas repetidas
+      de cada suite tras corregir el aislamiento de bases de datos entre archivos
+      de test (ver plan.md, "Nota de aislamiento de tests").
 
 ## Fase 8 — README
 
