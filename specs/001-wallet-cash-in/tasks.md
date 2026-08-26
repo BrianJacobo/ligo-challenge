@@ -5,15 +5,15 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 
 ## Fase 0 — Bootstrap
 
-- [ ] T0.1: Inicializar proyecto NestJS (`nest new`) con TypeScript strict mode.
-- [ ] T0.2: Agregar dependencias: `@nestjs/mongoose`, `mongoose`, `ioredis`,
+- [x] T0.1: Inicializar proyecto NestJS (`nest new`) con TypeScript strict mode.
+- [x] T0.2: Agregar dependencias: `@nestjs/mongoose`, `mongoose`, `ioredis`,
       `class-validator`, `class-transformer`, `uuid`.
-- [ ] T0.3: `docker-compose.yml` con MongoDB y Redis para desarrollo/tests locales.
-- [ ] T0.4: Configurar `ConfigModule` (env vars: `MONGO_URI`, `REDIS_URL`, `PORT`).
-- [ ] T0.4b: Configurar `app.useGlobalPipes(new ValidationPipe({ whitelist: true,
+- [x] T0.3: `docker-compose.yml` con MongoDB y Redis para desarrollo/tests locales.
+- [x] T0.4: Configurar `ConfigModule` (env vars: `MONGO_URI`, `REDIS_URL`, `PORT`).
+- [x] T0.4b: Configurar `app.useGlobalPipes(new ValidationPipe({ whitelist: true,
       forbidNonWhitelisted: true, transform: true, transformOptions: {
       enableImplicitConversion: true } }))` en `main.ts` (ver plan.md).
-- [ ] T0.5: Configurar Jest para unit + e2e (`test/jest-e2e.json`).
+- [x] T0.5: Configurar Jest para unit + e2e (`test/jest-e2e.json`).
 
 ## Fase 1 — Modelos y persistencia
 
