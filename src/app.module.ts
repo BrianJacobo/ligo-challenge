@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { CashInModule } from './cash-in/cash-in.module';
 import { WalletModule } from './wallet/wallet.module';
 import { PaymentProviderModule } from './payment-provider/payment-provider.module';
+import { IdempotencyModule } from './idempotency/idempotency.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { PaymentProviderModule } from './payment-provider/payment-provider.modul
     CashInModule,
     WalletModule,
     PaymentProviderModule,
+    IdempotencyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

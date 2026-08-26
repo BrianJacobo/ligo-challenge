@@ -40,12 +40,12 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 
 ## Fase 3 — Idempotencia y lock
 
-- [ ] T3.1: Implementar `IdempotencyLockService` sobre `ioredis`:
+- [x] T3.1: Implementar `IdempotencyLockService` sobre `ioredis`:
       `acquire(key, ttlMs)` → `SET key token NX PX ttlMs`, `release(key, token)` →
       script Lua o check-then-del para no borrar lock ajeno.
-- [ ] T3.2: Unit test: dos `acquire` concurrentes con la misma key → solo uno
+- [x] T3.2: Unit test: dos `acquire` concurrentes con la misma key → solo uno
       retorna éxito.
-- [ ] T3.3: Unit test: `release` con token incorrecto no borra el lock.
+- [x] T3.3: Unit test: `release` con token incorrecto no borra el lock.
 
 ## Fase 4 — POST /cash-in
 

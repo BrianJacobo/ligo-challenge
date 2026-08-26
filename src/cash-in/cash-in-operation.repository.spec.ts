@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { MongooseModule, getConnectionToken } from '@nestjs/mongoose';
-import { Connection } from 'mongoose';
+import { MongooseModule, getConnectionToken, getModelToken } from '@nestjs/mongoose';
+import { Connection, Model } from 'mongoose';
 import {
   CashInOperation,
+  CashInOperationDocument,
   CashInOperationSchema,
 } from './schemas/cash-in-operation.schema';
 import {
@@ -31,6 +32,13 @@ describe('CashInOperationRepository', () => {
 
     repository = moduleRef.get(CashInOperationRepository);
     connection = moduleRef.get(getConnectionToken());
+
+    // Mongoose builds indexes asynchronously in the background on connect;
+    // without waiting for them, the unique-index tests below would be flaky.
+    const model = moduleRef.get<Model<CashInOperationDocument>>(
+      getModelToken(CashInOperation.name),
+    );
+    await model.ensureIndexes();
   });
 
   afterEach(async () => {

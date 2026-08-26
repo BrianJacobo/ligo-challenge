@@ -108,6 +108,14 @@ la entrevista dado el stack al que postulas.
 - `{ operationId: 1 }` unique.
 - `{ userId: 1, createdAt: -1 }` para consultas futuras (no crítico ahora).
 
+**Nota de arranque:** Mongoose construye los índices en background al conectar y
+**no** bloquea las escrituras sobre ese modelo mientras tanto. Como el índice único
+de `idempotencyKey` es la garantía final anti-doble-cobro, `main.ts` espera
+explícitamente `cashInModel.ensureIndexes()` antes de `app.listen()` — un pod nunca
+debe aceptar tráfico sin esa protección activa. Esto se detectó como un test flaky
+(el índice único a veces "no aplicaba" en la primera escritura de un proceso recién
+conectado) y se corrigió tanto en el arranque real como en los tests.
+
 ### `wallets`
 
 ```ts
