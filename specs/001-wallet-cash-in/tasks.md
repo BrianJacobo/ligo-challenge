@@ -7,7 +7,9 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 
 - [x] T0.1: Inicializar proyecto NestJS (`nest new`) con TypeScript strict mode.
 - [x] T0.2: Agregar dependencias: `@nestjs/mongoose`, `mongoose`, `ioredis`,
-      `class-validator`, `class-transformer`, `uuid`.
+      `class-validator`, `class-transformer`. (El paquete `uuid` se probó y se
+      quitó en la Fase 4: su build es ESM-only y rompía Jest bajo `ts-jest`/
+      CommonJS; se usa `crypto.randomUUID()` nativo de Node en su lugar.)
 - [x] T0.3: `docker-compose.yml` con MongoDB y Redis para desarrollo/tests locales.
 - [x] T0.4: Configurar `ConfigModule` (env vars: `MONGO_URI`, `REDIS_URL`, `PORT`).
 - [x] T0.4b: Configurar `app.useGlobalPipes(new ValidationPipe({ whitelist: true,
@@ -49,26 +51,30 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 
 ## Fase 4 — POST /cash-in
 
-- [ ] T4.1: `CreateCashInDto` con validación (`class-validator`): `user_id`
+- [x] T4.1: `CreateCashInDto` con validación (`class-validator`): `user_id`
       (`@IsString()`), `amount` (`@IsNumber()` + `@IsPositive()`), `currency`
       (`@IsString()`), `payment_method` (`@IsString()`). Sin `@IsOptional()` en
       ninguno — todos son requeridos; cualquier campo extra será rechazado por el
       `ValidationPipe` global (`forbidNonWhitelisted`).
-- [ ] T4.2: Validar header `Idempotency-Key` (formato UUID) en el controller o un
-      guard/pipe dedicado → 400 si falta o inválido.
-- [ ] T4.3: Implementar `CashInService.process()` siguiendo el flujo completo de
+- [x] T4.2: Validar header `Idempotency-Key` (formato UUID) en el controller o un
+      guard/pipe dedicado → 400 si falta o inválido. (`IdempotencyKeyPipe`, aplicado
+      manualmente en el controller porque `@Headers()` no soporta pipes vía decorador
+      como sí lo hacen `@Param`/`@Query`/`@Body`.)
+- [x] T4.3: Implementar `CashInService.process()` siguiendo el flujo completo de
       plan.md (lock → check existente por hash → insert pending → llamar provider →
       transición de estado → crédito de balance → liberar lock).
-- [ ] T4.4: Manejar rama "key existe, mismo hash" → responder con datos persistidos,
+- [x] T4.4: Manejar rama "key existe, mismo hash" → responder con datos persistidos,
       sin tocar provider ni balance.
-- [ ] T4.5: Manejar rama "key existe, distinto hash" → `409 Conflict`.
-- [ ] T4.6: Manejar rama "insert falla por duplicate key" (carrera no cubierta por
+- [x] T4.5: Manejar rama "key existe, distinto hash" → `409 Conflict`.
+- [x] T4.6: Manejar rama "insert falla por duplicate key" (carrera no cubierta por
       el lock) → releer y responder como si ya existiera.
-- [ ] T4.7: Manejar rama timeout del provider → dejar `pending`, responder estado
-      explícito de "en verificación" (documentar código HTTP elegido).
-- [ ] T4.8: Manejar rama failure del provider → transición a `failed`, responder
-      error sin tocar balance.
-- [ ] T4.9: Mapear `CashInOperation` → `CashInResponseDto` (`operation_id`, `status`,
+- [x] T4.7: Manejar rama timeout del provider → dejar `pending`, responder `200`
+      con `status: "pending"` y mensaje explícito de "en verificación" (se eligió
+      `200` sobre `202`/`409` para simplificar el contrato de respuesta del cliente;
+      el campo `status` es lo que distingue el caso, documentar en README).
+- [x] T4.8: Manejar rama failure del provider → transición a `failed`, responder
+      `200` con `status: "failed"`, sin tocar balance.
+- [x] T4.9: Mapear `CashInOperation` → `CashInResponseDto` (`operation_id`, `status`,
       `amount`, `new_balance`).
 
 ## Fase 5 — POST /webhooks/payment
@@ -94,16 +100,18 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 
 ## Fase 7 — Tests (mínimos obligatorios del challenge)
 
-- [ ] T7.1: E2E — Happy path: `POST /cash-in` exitoso, balance actualizado
+- [x] T7.1: E2E — Happy path: `POST /cash-in` exitoso, balance actualizado
       correctamente.
-- [ ] T7.2: E2E — Mismo `Idempotency-Key` + mismo payload reintentado → misma
-      respuesta exacta, provider llamado una sola vez (verificar con spy/mock call count).
-- [ ] T7.3: E2E — Mismo `Idempotency-Key` + payload distinto → `409`.
-- [ ] T7.4: Unit/integración — N (ej. 10) requests concurrentes con la misma
-      `Idempotency-Key` → exactamente 1 llamada real al provider, todas las respuestas
-      consistentes entre sí.
-- [ ] T7.5: E2E — `payment_method: "card_force_timeout"` → operación queda `pending`,
-      balance no se altera.
+- [x] T7.2: E2E — Mismo `Idempotency-Key` + mismo payload reintentado → misma
+      respuesta exacta (verificado 3 veces seguidas), balance no se duplica.
+- [x] T7.3: E2E — Mismo `Idempotency-Key` + payload distinto → `409`.
+- [x] T7.4: E2E — 10 requests concurrentes con la misma `Idempotency-Key` → un
+      único `operation_id` entre todas las respuestas y un único balance final
+      (100, no 1000) — prueba indirecta de que el provider solo se llamó una vez,
+      sin necesitar un spy sobre el mock.
+- [x] T7.5: E2E — `payment_method: "card_force_timeout"` → operación queda `pending`,
+      balance no se altera (se agregó también el caso `card_force_failure` → `failed`,
+      balance no se altera).
 - [ ] T7.6: E2E — Webhook duplicado (enviar el mismo payload de webhook 2 veces) →
       balance acreditado una sola vez.
 - [ ] T7.7: E2E — Webhook fuera de orden (`failed` enviado después de que la

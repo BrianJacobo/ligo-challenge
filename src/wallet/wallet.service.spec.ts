@@ -4,8 +4,10 @@ import { Connection } from 'mongoose';
 import { Wallet, WalletSchema } from './schemas/wallet.schema';
 import { WalletService } from './wallet.service';
 
+// Each spec file gets its own database — see note in cash-in-operation.repository.spec.ts.
 const MONGO_URI =
-  process.env.MONGO_URI_TEST ?? 'mongodb://localhost:27017/ligo-cash-in-test';
+  process.env.MONGO_URI_TEST ??
+  'mongodb://localhost:27017/ligo-cash-in-test-wallet-service';
 
 describe('WalletService', () => {
   let service: WalletService;

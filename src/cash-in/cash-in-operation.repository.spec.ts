@@ -11,8 +11,12 @@ import {
   DuplicateIdempotencyKeyError,
 } from './cash-in-operation.repository';
 
+// Each spec file gets its own database — Jest runs suites as separate workers in
+// parallel, and sharing a DB means one suite's dropDatabase() (afterAll) can wipe
+// indexes/data out from under another suite still running.
 const MONGO_URI =
-  process.env.MONGO_URI_TEST ?? 'mongodb://localhost:27017/ligo-cash-in-test';
+  process.env.MONGO_URI_TEST ??
+  'mongodb://localhost:27017/ligo-cash-in-test-cash-in-operation-repository';
 
 describe('CashInOperationRepository', () => {
   let repository: CashInOperationRepository;

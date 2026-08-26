@@ -26,6 +26,15 @@ queremos aceptar campos ocultos que pudieran alterar el monto o el método de pa
 `number` real y no como string, evitando comparaciones/aritmética inconsistente
 sobre el monto a cobrar.
 
+## Generación de UUIDs
+
+Se usa `crypto.randomUUID()` (nativo de Node, sin dependencia externa) tanto para
+`operationId` como para el token del lock Redis. El paquete `uuid` se probó primero
+en la Fase 0 pero se descartó en la Fase 4: su build publicado es ESM-only y Jest
+(con `ts-jest` sobre CommonJS) no puede parsearlo (`SyntaxError: Unexpected token
+'export'`), lo cual rompía toda la suite de tests e2e. `crypto.randomUUID()` cubre
+el mismo caso de uso sin ese problema y sin dependencia adicional.
+
 ## Estructura de proyecto
 
 ```
