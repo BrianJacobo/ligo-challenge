@@ -17,15 +17,15 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 
 ## Fase 1 — Modelos y persistencia
 
-- [ ] T1.1: Crear `CashInOperationSchema` (Mongoose) según plan.md, con índice único
+- [x] T1.1: Crear `CashInOperationSchema` (Mongoose) según plan.md, con índice único
       en `idempotencyKey` y en `operationId`.
-- [ ] T1.2: Crear `WalletSchema` con índice único en `userId`.
-- [ ] T1.3: Crear `CashInOperationRepository` con métodos: `findByIdempotencyKey`,
+- [x] T1.2: Crear `WalletSchema` con índice único en `userId`.
+- [x] T1.3: Crear `CashInOperationRepository` con métodos: `findByIdempotencyKey`,
       `insertPending`, `updateStatusIfPending` (update condicional descrito en plan.md),
       `findByOperationId`.
-- [ ] T1.4: Crear `WalletService.creditBalance(userId, amount)` usando `$inc` atómico
+- [x] T1.4: Crear `WalletService.creditBalance(userId, amount)` usando `$inc` atómico
       (con `upsert: true` para crear wallet si no existe, balance inicial 0).
-- [ ] T1.5: Seed script o fixture de test para crear un wallet con balance inicial
+- [x] T1.5: Seed script o fixture de test para crear un wallet con balance inicial
       conocido (ej. 250.00) para pruebas manuales/e2e.
 
 ## Fase 2 — Payment Provider Mock
