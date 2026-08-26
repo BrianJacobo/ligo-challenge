@@ -37,7 +37,9 @@ export class PendingWebhookRepository {
       .then(() => undefined);
   }
 
-  async takeByOperationId(operationId: string): Promise<PendingWebhookDocument | null> {
+  async takeByOperationId(
+    operationId: string,
+  ): Promise<PendingWebhookDocument | null> {
     return this.model.findOneAndDelete({ operationId }).exec();
   }
 }

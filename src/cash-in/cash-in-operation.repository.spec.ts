@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { MongooseModule, getConnectionToken, getModelToken } from '@nestjs/mongoose';
+import {
+  MongooseModule,
+  getConnectionToken,
+  getModelToken,
+} from '@nestjs/mongoose';
 import { Connection, Model } from 'mongoose';
 import {
   CashInOperation,

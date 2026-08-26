@@ -240,9 +240,25 @@ desarrollo, no hipotéticos — cada uno detectado por un test que falló):
    `src/bootstrap.ts`, usado por ambos, para que este tipo de desincronización
    no pueda volver a pasar silenciosamente.
 
-**Por qué esto importa:** los puntos 2 y 3 son exactamente el tipo de detalle
+5. **El plan documentaba manejo de errores que el código no implementaba.**
+   `plan.md` decía desde la Fase 1 "fallo de Mongo → 503" y "fallo de Redis →
+   degradar a solo-Mongo", pero al escribir el código de `CashInService` esas
+   dos ramas nunca se implementaron: un fallo real de Mongo se propagaba como
+   `500` genérico, y un fallo de Redis en `acquire()` tumbaba toda la request
+   en vez de continuar sin lock. Esto no lo detectó ningún test hasta la
+   revisión final (Fase 9), al repasar los 10 escenarios del challenge uno por
+   uno contra el código real — "fallo temporal de DB" no tenía ni código ni
+   test que lo cubriera. Se corrigió distinguiendo `DuplicateIdempotencyKeyError`
+   (esperado) de cualquier otro error de Mongo (`ServiceUnavailableException`),
+   y envolviendo `lockService.acquire()` en un try/catch que degrada a confiar
+   solo en el índice único si Redis no responde.
+
+**Por qué esto importa:** los puntos 2, 3 y 5 son exactamente el tipo de detalle
 que un agente de IA (o un desarrollador apurado) puede pasar por alto porque el
 código "se ve correcto" — compila, y hasta puede pasar tests si estos no se
-ejecutan bajo las condiciones reales (multi-pod, tests en paralelo) que los
-exponen. Encontrarlos requirió correr la suite de tests repetidamente y
+ejecutan bajo las condiciones reales (multi-pod, tests en paralelo, infraestructura
+caída) que los exponen. El punto 5 en particular es una lección sobre spec-driven
+development: escribir la decisión en el plan no significa que el código la
+cumple — hay que verificarlo contra la implementación real, no solo contra la
+documentación. Encontrarlos requirió correr la suite de tests repetidamente y
 desconfiar de un resultado "verde" la primera vez, no solo leer el código.

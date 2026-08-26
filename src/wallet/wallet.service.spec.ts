@@ -18,7 +18,9 @@ describe('WalletService', () => {
     moduleRef = await Test.createTestingModule({
       imports: [
         MongooseModule.forRoot(MONGO_URI),
-        MongooseModule.forFeature([{ name: Wallet.name, schema: WalletSchema }]),
+        MongooseModule.forFeature([
+          { name: Wallet.name, schema: WalletSchema },
+        ]),
       ],
       providers: [WalletService],
     }).compile();
@@ -51,7 +53,9 @@ describe('WalletService', () => {
     await service.creditBalance('usr_concurrent', 0);
 
     await Promise.all(
-      Array.from({ length: 10 }, () => service.creditBalance('usr_concurrent', 10)),
+      Array.from({ length: 10 }, () =>
+        service.creditBalance('usr_concurrent', 10),
+      ),
     );
 
     const finalBalance = await service.getBalance('usr_concurrent');

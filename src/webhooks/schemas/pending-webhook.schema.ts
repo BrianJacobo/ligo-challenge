@@ -23,4 +23,5 @@ export class PendingWebhook {
   receivedAt: Date;
 }
 
-export const PendingWebhookSchema = SchemaFactory.createForClass(PendingWebhook);
+export const PendingWebhookSchema =
+  SchemaFactory.createForClass(PendingWebhook);

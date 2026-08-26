@@ -3,10 +3,11 @@ import { INestApplication } from '@nestjs/common';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import request from 'supertest';
+import { App } from 'supertest/types';
 import { createTestApp } from './helpers/create-test-app';
 
 describe('POST /webhooks/payment (e2e)', () => {
-  let app: INestApplication;
+  let app: INestApplication<App>;
   let connection: Connection;
 
   beforeAll(async () => {
@@ -25,7 +26,9 @@ describe('POST /webhooks/payment (e2e)', () => {
     await app.close();
   });
 
-  const webhookPayload = (overrides: Partial<Record<string, unknown>> = {}) => ({
+  const webhookPayload = (
+    overrides: Partial<Record<string, unknown>> = {},
+  ) => ({
     operation_id: 'op_test',
     provider_reference: 'prov_ref_1',
     status: 'success',
@@ -135,7 +138,10 @@ describe('POST /webhooks/payment (e2e)', () => {
       updatedAt: new Date(),
     });
 
-    const payload = webhookPayload({ operation_id: operationId, status: 'success' });
+    const payload = webhookPayload({
+      operation_id: operationId,
+      status: 'success',
+    });
 
     await request(app.getHttpServer())
       .post('/webhooks/payment')

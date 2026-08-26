@@ -25,7 +25,11 @@ export class CashInOperation {
   @Prop({ required: true })
   paymentMethod: string;
 
-  @Prop({ required: true, enum: ['pending', 'completed', 'failed'], default: 'pending' })
+  @Prop({
+    required: true,
+    enum: ['pending', 'completed', 'failed'],
+    default: 'pending',
+  })
   status: CashInOperationStatus;
 
   @Prop({ type: String, default: null })
@@ -38,7 +42,8 @@ export class CashInOperation {
   updatedAt?: Date;
 }
 
-export const CashInOperationSchema = SchemaFactory.createForClass(CashInOperation);
+export const CashInOperationSchema =
+  SchemaFactory.createForClass(CashInOperation);
 
 // operationId and idempotencyKey unique indexes are declared via @Prop({ unique: true }) above.
 CashInOperationSchema.index({ userId: 1, createdAt: -1 });

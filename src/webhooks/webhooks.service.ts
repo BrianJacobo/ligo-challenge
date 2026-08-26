@@ -19,7 +19,9 @@ export class WebhooksService {
     private readonly pendingWebhookRepository: PendingWebhookRepository,
   ) {}
 
-  async handlePaymentWebhook(dto: PaymentWebhookDto): Promise<WebhookAckResult> {
+  async handlePaymentWebhook(
+    dto: PaymentWebhookDto,
+  ): Promise<WebhookAckResult> {
     const newStatus: 'completed' | 'failed' =
       dto.status === 'success' ? 'completed' : 'failed';
     const providerReference = dto.provider_reference ?? null;
@@ -28,7 +30,9 @@ export class WebhooksService {
       `Received payment webhook for operation ${dto.operation_id}: status=${dto.status}`,
     );
 
-    const operation = await this.operationRepository.findByOperationId(dto.operation_id);
+    const operation = await this.operationRepository.findByOperationId(
+      dto.operation_id,
+    );
 
     if (!operation) {
       // Sync POST /cash-in insert for this operation hasn't landed yet — buffer

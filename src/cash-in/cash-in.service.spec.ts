@@ -34,7 +34,9 @@ describe('CashInService — early webhook drain', () => {
     };
 
     const lockService = {
-      acquire: jest.fn().mockResolvedValue({ key: 'idempotency:key-1', token: 't' }),
+      acquire: jest
+        .fn()
+        .mockResolvedValue({ key: 'idempotency:key-1', token: 't' }),
       release: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -56,7 +58,9 @@ describe('CashInService — early webhook drain', () => {
     };
 
     const transitionService = {
-      resolve: jest.fn().mockResolvedValue({ ...insertedOperation, status: 'completed' }),
+      resolve: jest
+        .fn()
+        .mockResolvedValue({ ...insertedOperation, status: 'completed' }),
     };
 
     const paymentProvider = { charge: jest.fn() };
@@ -68,7 +72,10 @@ describe('CashInService — early webhook drain', () => {
         { provide: IdempotencyLockService, useValue: lockService },
         { provide: WalletService, useValue: walletService },
         { provide: OperationTransitionService, useValue: transitionService },
-        { provide: PendingWebhookRepository, useValue: pendingWebhookRepository },
+        {
+          provide: PendingWebhookRepository,
+          useValue: pendingWebhookRepository,
+        },
         { provide: PAYMENT_PROVIDER, useValue: paymentProvider },
       ],
     }).compile();
@@ -89,7 +96,10 @@ describe('CashInService — early webhook drain', () => {
     );
     // The provider must never be called — the webhook already settled the outcome.
     expect(paymentProvider.charge).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ operation_id: 'op_generated_1', status: 'completed' });
+    expect(result).toMatchObject({
+      operation_id: 'op_generated_1',
+      status: 'completed',
+    });
   });
 
   it('falls through to charging the provider when no webhook was buffered', async () => {
@@ -110,7 +120,9 @@ describe('CashInService — early webhook drain', () => {
     };
 
     const lockService = {
-      acquire: jest.fn().mockResolvedValue({ key: 'idempotency:key-2', token: 't' }),
+      acquire: jest
+        .fn()
+        .mockResolvedValue({ key: 'idempotency:key-2', token: 't' }),
       release: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -124,10 +136,14 @@ describe('CashInService — early webhook drain', () => {
       buffer: jest.fn(),
     };
 
-    const transitionService = { resolve: jest.fn().mockResolvedValue(insertedOperation) };
+    const transitionService = {
+      resolve: jest.fn().mockResolvedValue(insertedOperation),
+    };
 
     const paymentProvider = {
-      charge: jest.fn().mockResolvedValue({ outcome: 'success', providerReference: 'prov_1' }),
+      charge: jest
+        .fn()
+        .mockResolvedValue({ outcome: 'success', providerReference: 'prov_1' }),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -137,7 +153,10 @@ describe('CashInService — early webhook drain', () => {
         { provide: IdempotencyLockService, useValue: lockService },
         { provide: WalletService, useValue: walletService },
         { provide: OperationTransitionService, useValue: transitionService },
-        { provide: PendingWebhookRepository, useValue: pendingWebhookRepository },
+        {
+          provide: PendingWebhookRepository,
+          useValue: pendingWebhookRepository,
+        },
         { provide: PAYMENT_PROVIDER, useValue: paymentProvider },
       ],
     }).compile();

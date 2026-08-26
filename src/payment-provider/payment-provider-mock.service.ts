@@ -28,7 +28,9 @@ function delay(ms: number): Promise<void> {
  */
 @Injectable()
 export class PaymentProviderMockService implements PaymentProvider {
-  async charge(input: PaymentProviderChargeInput): Promise<PaymentProviderResult> {
+  async charge(
+    input: PaymentProviderChargeInput,
+  ): Promise<PaymentProviderResult> {
     if (input.paymentMethod === FORCE_TIMEOUT_METHOD) {
       await delay(SIMULATED_TIMEOUT_MS);
       throw new PaymentProviderTimeoutError();

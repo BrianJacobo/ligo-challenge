@@ -17,7 +17,9 @@ function mockContext(headers: Record<string, string>): ExecutionContext {
 function mockCallHandler(captured: { correlationId?: string }): CallHandler {
   return {
     handle: () =>
-      of(void (captured.correlationId = RequestContextStore.getCorrelationId())),
+      of(
+        void (captured.correlationId = RequestContextStore.getCorrelationId()),
+      ),
   };
 }
 

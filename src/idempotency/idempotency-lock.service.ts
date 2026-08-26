@@ -27,7 +27,10 @@ const LOCK_KEY_PREFIX = 'idempotency:';
 export class IdempotencyLockService implements OnModuleDestroy {
   constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
 
-  async acquire(idempotencyKey: string, ttlMs: number): Promise<AcquiredLock | null> {
+  async acquire(
+    idempotencyKey: string,
+    ttlMs: number,
+  ): Promise<AcquiredLock | null> {
     const key = `${LOCK_KEY_PREFIX}${idempotencyKey}`;
     const token = randomUUID();
 

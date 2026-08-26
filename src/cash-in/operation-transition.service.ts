@@ -12,7 +12,9 @@ import { ContextualLogger } from '../common/logger/contextual-logger';
  */
 @Injectable()
 export class OperationTransitionService {
-  private readonly logger = new ContextualLogger(OperationTransitionService.name);
+  private readonly logger = new ContextualLogger(
+    OperationTransitionService.name,
+  );
 
   constructor(
     private readonly repository: CashInOperationRepository,

@@ -283,11 +283,20 @@ determinísticos de cada rama, sin `Math.random` como único mecanismo.
 ## Manejo de errores (RNF3)
 
 - Fallo de conexión a Mongo al insertar: responder `503`, nunca `200`. El cliente
-  debe reintentar (idempotencia garantiza seguridad).
+  debe reintentar (idempotencia garantiza seguridad). Implementado en
+  `CashInService.process()`: se distingue `DuplicateIdempotencyKeyError`
+  (esperado, se resuelve leyendo el documento existente) de cualquier otro error
+  de Mongo (`ServiceUnavailableException` → 503).
 - Fallo de Redis (lock no disponible): degradar a "confiar solo en el índice único
-  de Mongo" — se documenta como trade-off aceptado (mayor probabilidad de intentos
-  duplicados contra el provider en la ventana de carrera, pero **nunca doble
-  acreditación**, porque el update condicional + índice único lo previenen).
+  de Mongo" — trade-off aceptado (mayor probabilidad de intentos duplicados
+  contra el provider en la ventana de carrera, pero **nunca doble acreditación**,
+  porque el update condicional + índice único lo previenen). Implementado
+  envolviendo `lockService.acquire()` en un try/catch: si Redis lanza, se
+  continúa sin lock (`lock = null`) y nunca se intenta `release()` sobre un lock
+  que nunca se adquirió. Cubierto por tests en
+  `cash-in.service.resilience.spec.ts` — este gap entre lo documentado aquí y lo
+  implementado se detectó recién en la revisión final (Fase 9), al repasar los
+  10 escenarios del challenge contra el código real uno por uno.
 
 ## Tests (mapeo a spec)
 

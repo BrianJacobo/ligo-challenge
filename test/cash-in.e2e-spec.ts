@@ -3,10 +3,19 @@ import { INestApplication } from '@nestjs/common';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import request from 'supertest';
+import { App } from 'supertest/types';
 import { createTestApp } from './helpers/create-test-app';
 
+interface CashInApiResponse {
+  operation_id: string;
+  status: 'pending' | 'completed' | 'failed';
+  amount?: number;
+  new_balance?: number;
+  message?: string;
+}
+
 describe('POST /cash-in (e2e)', () => {
-  let app: INestApplication;
+  let app: INestApplication<App>;
   let connection: Connection;
 
   beforeAll(async () => {
@@ -41,12 +50,13 @@ describe('POST /cash-in (e2e)', () => {
       .send(validPayload())
       .expect(200);
 
-    expect(response.body).toMatchObject({
+    const body = response.body as CashInApiResponse;
+    expect(body).toMatchObject({
       status: 'completed',
       amount: 100,
       new_balance: 100,
     });
-    expect(response.body.operation_id).toMatch(/^op_/);
+    expect(body.operation_id).toMatch(/^op_/);
   });
 
   it('rejects requests without an Idempotency-Key header', async () => {
@@ -96,7 +106,9 @@ describe('POST /cash-in (e2e)', () => {
       .set('Idempotency-Key', idempotencyKey)
       .send(payload)
       .expect(200);
-    expect(third.body.new_balance).toBe(first.body.new_balance);
+    const firstBody = first.body as CashInApiResponse;
+    const thirdBody = third.body as CashInApiResponse;
+    expect(thirdBody.new_balance).toBe(firstBody.new_balance);
   });
 
   it('rejects reusing the same Idempotency-Key with a different payload', async () => {
@@ -129,14 +141,16 @@ describe('POST /cash-in (e2e)', () => {
       ),
     );
 
+    const bodies = responses.map((r) => r.body as CashInApiResponse);
+
     const operationIds = new Set(
-      responses.filter((r) => r.body.operation_id).map((r) => r.body.operation_id),
+      bodies.filter((b) => b.operation_id).map((b) => b.operation_id),
     );
     expect(operationIds.size).toBe(1);
 
-    const balanceResponses = responses
-      .filter((r) => r.body.new_balance !== undefined)
-      .map((r) => r.body.new_balance);
+    const balanceResponses = bodies
+      .filter((b) => b.new_balance !== undefined)
+      .map((b) => b.new_balance);
     // Every response that reports a balance must report the SAME balance —
     // proof the provider/wallet credit only happened once.
     expect(new Set(balanceResponses).size).toBe(1);
@@ -149,17 +163,24 @@ describe('POST /cash-in (e2e)', () => {
     const response = await request(app.getHttpServer())
       .post('/cash-in')
       .set('Idempotency-Key', idempotencyKey)
-      .send(validPayload({ user_id: 'usr_timeout', payment_method: 'card_force_timeout' }))
+      .send(
+        validPayload({
+          user_id: 'usr_timeout',
+          payment_method: 'card_force_timeout',
+        }),
+      )
       .expect(200);
 
-    expect(response.body.status).toBe('pending');
+    expect((response.body as CashInApiResponse).status).toBe('pending');
 
     const stored = await connection
       .collection('cash_in_operations')
       .findOne({ idempotencyKey });
     expect(stored?.status).toBe('pending');
 
-    const wallet = await connection.collection('wallets').findOne({ userId: 'usr_timeout' });
+    const wallet = await connection
+      .collection('wallets')
+      .findOne({ userId: 'usr_timeout' });
     expect(wallet).toBeNull();
   });
 
@@ -169,12 +190,19 @@ describe('POST /cash-in (e2e)', () => {
     const response = await request(app.getHttpServer())
       .post('/cash-in')
       .set('Idempotency-Key', idempotencyKey)
-      .send(validPayload({ user_id: 'usr_failure', payment_method: 'card_force_failure' }))
+      .send(
+        validPayload({
+          user_id: 'usr_failure',
+          payment_method: 'card_force_failure',
+        }),
+      )
       .expect(200);
 
-    expect(response.body.status).toBe('failed');
+    expect((response.body as CashInApiResponse).status).toBe('failed');
 
-    const wallet = await connection.collection('wallets').findOne({ userId: 'usr_failure' });
+    const wallet = await connection
+      .collection('wallets')
+      .findOne({ userId: 'usr_failure' });
     expect(wallet).toBeNull();
   });
 });

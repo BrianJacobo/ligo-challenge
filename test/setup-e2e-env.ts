@@ -6,6 +6,8 @@
 const workerId = process.env.JEST_WORKER_ID ?? '0';
 
 process.env.MONGO_URI =
-  process.env.MONGO_URI_TEST ?? `mongodb://localhost:27017/ligo-cash-in-e2e-${workerId}`;
+  process.env.MONGO_URI_TEST ??
+  `mongodb://localhost:27017/ligo-cash-in-e2e-${workerId}`;
 process.env.REDIS_URL =
-  process.env.REDIS_URL_TEST ?? `redis://localhost:6379/${1 + Number(workerId)}`;
+  process.env.REDIS_URL_TEST ??
+  `redis://localhost:6379/${1 + Number(workerId)}`;

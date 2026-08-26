@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { CashInOperation, CashInOperationSchema } from './schemas/cash-in-operation.schema';
+import {
+  CashInOperation,
+  CashInOperationSchema,
+} from './schemas/cash-in-operation.schema';
 import { CashInOperationRepository } from './cash-in-operation.repository';
 import { CashInController } from './cash-in.controller';
 import { CashInService } from './cash-in.service';
@@ -21,7 +24,11 @@ import { PendingWebhookModule } from '../webhooks/pending-webhook.module';
     PendingWebhookModule,
   ],
   controllers: [CashInController],
-  providers: [CashInOperationRepository, CashInService, OperationTransitionService],
+  providers: [
+    CashInOperationRepository,
+    CashInService,
+    OperationTransitionService,
+  ],
   exports: [CashInOperationRepository, OperationTransitionService],
 })
 export class CashInModule {}

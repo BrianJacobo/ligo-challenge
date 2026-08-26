@@ -1,4 +1,11 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Headers } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Headers,
+} from '@nestjs/common';
 import { CashInService } from './cash-in.service';
 import { CreateCashInDto } from './dto/create-cash-in.dto';
 import { IdempotencyKeyPipe } from './idempotency-key.pipe';
@@ -11,7 +18,10 @@ export class CashInController {
 
   @Post()
   @HttpCode(HttpStatus.OK)
-  create(@Body() dto: CreateCashInDto, @Headers('idempotency-key') rawIdempotencyKey?: string) {
+  create(
+    @Body() dto: CreateCashInDto,
+    @Headers('idempotency-key') rawIdempotencyKey?: string,
+  ) {
     const idempotencyKey = this.idempotencyKeyPipe.transform(rawIdempotencyKey);
     return this.cashInService.process(dto, idempotencyKey);
   }

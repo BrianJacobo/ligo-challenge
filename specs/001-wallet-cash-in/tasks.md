@@ -158,11 +158,42 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 
 ## Fase 9 — Revisión final
 
-- [ ] T9.1: Repasar los 10 escenarios del challenge original uno por uno y confirmar
-      que cada uno está cubierto por código y/o test (o documentado como limitación
-      consciente).
-- [ ] T9.2: Revisar que ningún "red flag" de la rúbrica aplique a la solución final
-      (idempotencia en memoria, ignorar multi-pod, retry indiscriminado, confiar en
-      webhook único, sin tests).
-- [ ] T9.3: Limpiar código generado por el agente que no se usa, TODOs olvidados,
-      logs de debug.
+- [x] T9.1: Repasar los 10 escenarios del challenge original uno por uno y confirmar
+      que cada uno está cubierto por código y/o test:
+      1. Doble click → `returns the same response when retried...` ✅
+      2. Retry automático de la app → mismo test que (1) ✅
+      3. Múltiples pods concurrentes → `does not double-charge under N concurrent
+         requests` (10 en paralelo) ✅
+      4. Timeout del proveedor → `leaves the operation pending...on provider
+         timeout` ✅
+      5. Webhook duplicado → `ignores a duplicate webhook without crediting...` ✅
+      6. Webhook fuera de orden → `does not let an out-of-order "failed"
+         overwrite...` ✅
+      7. Webhook antes que la respuesta del API → `buffers a webhook...` (e2e) +
+         `applies a webhook that was buffered before the operation existed` (unit,
+         drenado real) ✅
+      8. **Fallo temporal de DB** → gap real encontrado en esta revisión: el plan
+         lo documentaba desde la Fase 1 pero el código nunca lo implementaba.
+         Corregido: `CashInService` ahora distingue `DuplicateIdempotencyKeyError`
+         de cualquier otro fallo de Mongo (→ 503), cubierto por
+         `cash-in.service.resilience.spec.ts` ✅
+      9. Reinicio del servicio durante la operación → cubierto indirectamente por
+         `does not release a lock held by a different token` (lock huérfano tras
+         reinicio) + la garantía de que el estado persistido en Mongo permite
+         retomar con seguridad ✅
+      10. Race condition sobre el saldo → `applies concurrent credits without
+          lost updates ($inc is atomic)` ✅
+- [x] T9.2: Revisar red flags de la rúbrica — ninguno aplica a la solución final:
+      idempotencia solo en memoria (no, usa índice único de Mongo), no considera
+      multi-pod (sí lo considera, es el diseño central), retry indiscriminado
+      contra el proveedor (no existe, nunca se reintenta automáticamente contra
+      el provider), confía en webhook único (no, maneja duplicados/fuera de
+      orden/temprano explícitamente), no escribe pruebas (26 unit + 16 e2e).
+      Al revisar T9.1 se encontró y corrigió un gap real de "manejo de errores"
+      (T9.1 punto 8) que hubiera sido un red flag de facto si no se detectaba.
+- [x] T9.3: Limpiar código generado por el agente que no se usa, TODOs olvidados,
+      logs de debug. Se eliminó `test/helpers/wallet.fixture.ts` (helper creado
+      en la Fase 1, nunca usado — los e2e terminaron insertando fixtures
+      directamente). Se corrigió `npm run lint` a 0 errores/0 warnings (antes:
+      11 errores, 24 warnings — tipos `any` sin acotar en tests e2e, un floating
+      promise en `main.ts`).

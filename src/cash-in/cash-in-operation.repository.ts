@@ -34,15 +34,21 @@ export class CashInOperationRepository {
     private readonly model: Model<CashInOperationDocument>,
   ) {}
 
-  findByIdempotencyKey(idempotencyKey: string): Promise<CashInOperationDocument | null> {
+  findByIdempotencyKey(
+    idempotencyKey: string,
+  ): Promise<CashInOperationDocument | null> {
     return this.model.findOne({ idempotencyKey }).exec();
   }
 
-  findByOperationId(operationId: string): Promise<CashInOperationDocument | null> {
+  findByOperationId(
+    operationId: string,
+  ): Promise<CashInOperationDocument | null> {
     return this.model.findOne({ operationId }).exec();
   }
 
-  async insertPending(input: InsertPendingInput): Promise<CashInOperationDocument> {
+  async insertPending(
+    input: InsertPendingInput,
+  ): Promise<CashInOperationDocument> {
     try {
       return await this.model.create({
         ...input,

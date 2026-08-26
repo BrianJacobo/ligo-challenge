@@ -1,5 +1,9 @@
 import { randomUUID, createHash } from 'crypto';
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import {
   PAYMENT_PROVIDER,
@@ -8,7 +12,10 @@ import {
 import type { PaymentProvider } from '../payment-provider/payment-provider.interface';
 import { IdempotencyLockService } from '../idempotency/idempotency-lock.service';
 import { WalletService } from '../wallet/wallet.service';
-import { CashInOperationRepository } from './cash-in-operation.repository';
+import {
+  CashInOperationRepository,
+  DuplicateIdempotencyKeyError,
+} from './cash-in-operation.repository';
 import { OperationTransitionService } from './operation-transition.service';
 import { PendingWebhookRepository } from '../webhooks/pending-webhook.repository';
 import { CashInOperationDocument } from './schemas/cash-in-operation.schema';
@@ -22,7 +29,9 @@ const LOCK_WAIT_BACKOFF_MS = 200;
 
 export class OperationInProgressException extends ConflictException {
   constructor() {
-    super('Operation is already in progress for this Idempotency-Key, retry shortly');
+    super(
+      'Operation is already in progress for this Idempotency-Key, retry shortly',
+    );
   }
 }
 
@@ -65,14 +74,32 @@ export class CashInService {
 
     const requestHash = this.hashRequest(dto);
 
-    const lock = await this.lockService.acquire(idempotencyKey, LOCK_TTL_MS);
+    // Redis is a concurrency optimization, not the idempotency guarantee — if
+    // it's unreachable, degrade to relying solely on Mongo's unique index
+    // instead of failing the whole request. This raises (but doesn't eliminate)
+    // the odds of calling the payment provider twice for a race the lock would
+    // have prevented; it can NEVER cause double-crediting, since the
+    // conditional transition + unique index still apply either way.
+    let lock: Awaited<ReturnType<IdempotencyLockService['acquire']>> = null;
+    let redisAvailable = true;
+    try {
+      lock = await this.lockService.acquire(idempotencyKey, LOCK_TTL_MS);
+    } catch (error) {
+      redisAvailable = false;
+      this.logger.warn(
+        `Redis lock unavailable, proceeding without it (Mongo's unique index remains the final guarantee): ${String(error)}`,
+      );
+    }
 
-    if (!lock) {
+    if (redisAvailable && !lock) {
+      // Redis is up but another request already holds the lock for this key —
+      // wait briefly for it to finish rather than racing the insert ourselves.
       return this.waitForConcurrentResult(idempotencyKey, requestHash);
     }
 
     try {
-      const existing = await this.repository.findByIdempotencyKey(idempotencyKey);
+      const existing =
+        await this.repository.findByIdempotencyKey(idempotencyKey);
       if (existing) {
         return this.resolveExisting(existing, requestHash);
       }
@@ -88,11 +115,23 @@ export class CashInService {
           paymentMethod: dto.payment_method,
           requestHash,
         });
-      } catch {
+      } catch (error) {
+        if (!(error instanceof DuplicateIdempotencyKeyError)) {
+          // A real Mongo failure (connection drop, timeout, etc.) — never
+          // report success if we can't confirm the write happened. The client
+          // must retry; idempotency guarantees that's safe.
+          this.logger.error(
+            `Failed to persist cash-in operation for idempotencyKey ${idempotencyKey}: ${String(error)}`,
+          );
+          throw new ServiceUnavailableException(
+            'Could not persist the operation, please retry with the same Idempotency-Key',
+          );
+        }
         // Lost a race the lock didn't cover (e.g. another pod inserted between
         // our findByIdempotencyKey and insertPending). The unique index is the
         // final guarantee here.
-        const raced = await this.repository.findByIdempotencyKey(idempotencyKey);
+        const raced =
+          await this.repository.findByIdempotencyKey(idempotencyKey);
         if (!raced) {
           throw new Error(
             `Insert conflicted on idempotencyKey "${idempotencyKey}" but no document was found afterwards`,
@@ -104,14 +143,19 @@ export class CashInService {
       // The operation now exists — if a webhook arrived earlier and was buffered
       // (see plan.md "Flujo: POST /webhooks/payment", paso 3), apply it now
       // instead of racing the payment provider call below.
-      const bufferedResult = await this.applyBufferedWebhookIfAny(operation, dto);
+      const bufferedResult = await this.applyBufferedWebhookIfAny(
+        operation,
+        dto,
+      );
       if (bufferedResult) {
         return bufferedResult;
       }
 
       return await this.chargeAndResolve(operation, dto);
     } finally {
-      await this.lockService.release(lock);
+      if (lock) {
+        await this.lockService.release(lock);
+      }
     }
   }
 
@@ -208,7 +252,8 @@ export class CashInService {
   ): Promise<CashInResponseDto | PendingVerificationResult> {
     for (let attempt = 0; attempt < LOCK_WAIT_RETRIES; attempt++) {
       await delay(LOCK_WAIT_BACKOFF_MS);
-      const existing = await this.repository.findByIdempotencyKey(idempotencyKey);
+      const existing =
+        await this.repository.findByIdempotencyKey(idempotencyKey);
       if (existing) {
         return this.resolveExisting(existing, requestHash);
       }
@@ -231,7 +276,9 @@ export class CashInService {
 
   private hashRequest(dto: CreateCashInDto): string {
     return createHash('sha256')
-      .update(`${dto.user_id}:${dto.amount}:${dto.currency}:${dto.payment_method}`)
+      .update(
+        `${dto.user_id}:${dto.amount}:${dto.currency}:${dto.payment_method}`,
+      )
       .digest('hex');
   }
 }
