@@ -98,11 +98,15 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 
 ## Fase 6 — Observabilidad
 
-- [ ] T6.1: Interceptor/middleware que genera o propaga `correlationId` (usa
+- [x] T6.1: Interceptor/middleware que genera o propaga `correlationId` (usa
       `Idempotency-Key` si existe) y lo inyecta en el logger contextual de cada
-      request.
-- [ ] T6.2: Agregar logs con `operationId` + `correlationId` en los puntos clave:
-      inicio de proceso, resultado del provider, transición de estado, webhook recibido.
+      request. Implementado con `AsyncLocalStorage` nativo de Node (sin
+      dependencia externa) + `ContextualLogger` que extiende `ConsoleLogger` de
+      Nest. También se devuelve como header `X-Correlation-Id` en la respuesta.
+- [x] T6.2: Agregar logs con `operationId` + `correlationId` en los puntos clave:
+      inicio de proceso, resultado del provider, transición de estado, webhook
+      recibido. (El `correlationId` se agrega automáticamente vía
+      `ContextualLogger`, no hay que pasarlo a mano en cada log.)
 
 ## Fase 7 — Tests (mínimos obligatorios del challenge)
 

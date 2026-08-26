@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CashInOperationRepository } from '../cash-in/cash-in-operation.repository';
 import { OperationTransitionService } from '../cash-in/operation-transition.service';
 import { PendingWebhookRepository } from './pending-webhook.repository';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
+import { ContextualLogger } from '../common/logger/contextual-logger';
 
 export interface WebhookAckResult {
   received: true;
@@ -10,7 +11,7 @@ export interface WebhookAckResult {
 
 @Injectable()
 export class WebhooksService {
-  private readonly logger = new Logger(WebhooksService.name);
+  private readonly logger = new ContextualLogger(WebhooksService.name);
 
   constructor(
     private readonly operationRepository: CashInOperationRepository,
@@ -22,6 +23,10 @@ export class WebhooksService {
     const newStatus: 'completed' | 'failed' =
       dto.status === 'success' ? 'completed' : 'failed';
     const providerReference = dto.provider_reference ?? null;
+
+    this.logger.log(
+      `Received payment webhook for operation ${dto.operation_id}: status=${dto.status}`,
+    );
 
     const operation = await this.operationRepository.findByOperationId(dto.operation_id);
 

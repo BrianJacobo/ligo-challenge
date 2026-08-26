@@ -262,11 +262,23 @@ determinísticos de cada rama, sin `Math.random` como único mecanismo.
 
 ## Observabilidad
 
-- Interceptor global que genera/propaga `correlationId` (usa `Idempotency-Key` si
-  está presente, si no genera uno) y lo agrega a un `AsyncLocalStorage` o al logger
-  contextual de Nest.
-- Todo log dentro de `cash-in.service.ts` y `webhooks.service.ts` incluye
-  `operationId` + `correlationId`.
+- `CorrelationIdInterceptor` (global): resuelve un `correlationId` por request con
+  esta prioridad — header `X-Correlation-Id` si viene, si no `Idempotency-Key` (así
+  el request original y sus reintentos comparten un solo id), si no un
+  `crypto.randomUUID()` nuevo. Lo guarda en un `AsyncLocalStorage`
+  (`RequestContextStore`) y lo devuelve también en la respuesta como
+  `X-Correlation-Id`.
+- `ContextualLogger` (extiende `ConsoleLogger` de Nest): antepone
+  `[correlationId=...]` a cada línea de log automáticamente, leyendo del
+  `AsyncLocalStorage` — los servicios no necesitan pasar el id manualmente.
+- Logs en los puntos clave pedidos: inicio de `CashInService.process()`, resultado
+  del Payment Provider, cada transición de estado (`OperationTransitionService`,
+  compartido por cash-in y webhooks), y recepción de cada webhook.
+- La configuración de la app (interceptor global, `ValidationPipe`, espera de
+  `ensureIndexes()`) vive en `src/bootstrap.ts` y la usan tanto `main.ts` como el
+  helper de tests e2e (`test/helpers/create-test-app.ts`) — evita que ambos se
+  desincronicen; de hecho, al implementar esto se detectó que el helper de tests
+  ya se había quedado atrás de una config anterior de `main.ts`.
 
 ## Manejo de errores (RNF3)
 

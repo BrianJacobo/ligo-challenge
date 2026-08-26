@@ -1,5 +1,5 @@
 import { randomUUID, createHash } from 'crypto';
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import {
   PAYMENT_PROVIDER,
@@ -14,6 +14,7 @@ import { PendingWebhookRepository } from '../webhooks/pending-webhook.repository
 import { CashInOperationDocument } from './schemas/cash-in-operation.schema';
 import { CreateCashInDto } from './dto/create-cash-in.dto';
 import { CashInResponseDto } from './dto/cash-in-response.dto';
+import { ContextualLogger } from '../common/logger/contextual-logger';
 
 const LOCK_TTL_MS = 10_000;
 const LOCK_WAIT_RETRIES = 3;
@@ -43,7 +44,7 @@ function delay(ms: number): Promise<void> {
 
 @Injectable()
 export class CashInService {
-  private readonly logger = new Logger(CashInService.name);
+  private readonly logger = new ContextualLogger(CashInService.name);
 
   constructor(
     private readonly repository: CashInOperationRepository,
@@ -58,6 +59,10 @@ export class CashInService {
     dto: CreateCashInDto,
     idempotencyKey: string,
   ): Promise<CashInResponseDto | PendingVerificationResult> {
+    this.logger.log(
+      `Processing cash-in for user ${dto.user_id}, amount ${dto.amount} ${dto.currency}, idempotencyKey ${idempotencyKey}`,
+    );
+
     const requestHash = this.hashRequest(dto);
 
     const lock = await this.lockService.acquire(idempotencyKey, LOCK_TTL_MS);
@@ -146,6 +151,10 @@ export class CashInService {
         currency: dto.currency,
         paymentMethod: dto.payment_method,
       });
+
+      this.logger.log(
+        `Payment provider responded for operation ${operation.operationId}: outcome=${result.outcome}`,
+      );
 
       const newStatus = result.outcome === 'success' ? 'completed' : 'failed';
       const updated = await this.transitionService.resolve(

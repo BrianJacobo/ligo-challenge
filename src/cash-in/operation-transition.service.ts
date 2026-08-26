@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { WalletService } from '../wallet/wallet.service';
 import { CashInOperationRepository } from './cash-in-operation.repository';
 import { CashInOperationDocument } from './schemas/cash-in-operation.schema';
+import { ContextualLogger } from '../common/logger/contextual-logger';
 
 /**
  * Applies the conditional "pending -> completed/failed" transition and, only when
@@ -11,7 +12,7 @@ import { CashInOperationDocument } from './schemas/cash-in-operation.schema';
  */
 @Injectable()
 export class OperationTransitionService {
-  private readonly logger = new Logger(OperationTransitionService.name);
+  private readonly logger = new ContextualLogger(OperationTransitionService.name);
 
   constructor(
     private readonly repository: CashInOperationRepository,
@@ -38,8 +39,11 @@ export class OperationTransitionService {
       return null;
     }
 
+    this.logger.log(`Operation ${operationId} transitioned to "${newStatus}"`);
+
     if (newStatus === 'completed') {
       await this.walletService.creditBalance(userId, amount);
+      this.logger.log(`Credited ${amount} to wallet for user ${userId}`);
     }
 
     return updated;
