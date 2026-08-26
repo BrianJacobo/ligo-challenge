@@ -30,12 +30,12 @@ Orden pensado para tener siempre algo ejecutable (no bloquear tests hasta el fin
 
 ## Fase 2 — Payment Provider Mock
 
-- [ ] T2.1: Definir interfaz `PaymentProvider` (plan.md).
-- [ ] T2.2: Implementar `PaymentProviderMockService`:
+- [x] T2.1: Definir interfaz `PaymentProvider` (plan.md).
+- [x] T2.2: Implementar `PaymentProviderMockService`:
       - `paymentMethod` normal → `success` tras latencia simulada corta (ej. 50-200ms).
       - `paymentMethod === "card_force_timeout"` → lanza timeout tras N ms.
       - `paymentMethod === "card_force_failure"` → retorna `failure` inmediato.
-- [ ] T2.3: Unit test de `PaymentProviderMockService` (los 3 outcomes se disparan
+- [x] T2.3: Unit test de `PaymentProviderMockService` (los 3 outcomes se disparan
       correctamente según input).
 
 ## Fase 3 — Idempotencia y lock
