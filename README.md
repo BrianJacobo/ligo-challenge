@@ -137,33 +137,48 @@ Cualquier otro valor simula éxito.
 
 ### Cómo abordé el problema
 
-1. **Spec-driven development en Claude Code.** Antes de escribir código, generé
-   `spec.md` (requisitos y criterios de aceptación) y `plan.md` (arquitectura y
-   decisiones técnicas) en conversación, y los revisé requisito por requisito
-   contra el PDF del challenge antes de dejar que se ejecutara ninguna tarea.
-   Documenté ese razonamiento inicial en mis notas antes de tocar el editor:
-   el problema central ("el proveedor cobra, hay timeout, ¿cómo evito cobrar
-   dos veces?"), que el proveedor de pago sería un simulador interno (mock
-   in-process, no un servicio HTTP real), y el stack — NestJS, MongoDB como
-   fuente de verdad con índice único en `idempotencyKey`, Redis como lock de
-   corta duración, Jest para tests.
+Trabajé con **Claude Code y Cursor en paralelo**: Claude Code generó las specs
+y el código fase por fase, y tuve Cursor abierto al mismo tiempo para
+inspeccionar visualmente el código a medida que se iba generando, en vez de
+confiar solo en el resumen que el agente reporta en la terminal.
+
+1. **Spec-driven development.** Antes de escribir código, generé `spec.md`
+   (requisitos y criterios de aceptación) y `plan.md` (arquitectura y
+   decisiones técnicas) a partir del PDF del challenge. Dejé explícito desde
+   el inicio el problema central ("el proveedor cobra, hay timeout, ¿cómo
+   evito cobrar dos veces?"), que el proveedor de pago sería un simulador
+   interno — un mock in-process, no un servicio HTTP real — y el stack:
+   NestJS, MongoDB como fuente de verdad con índice único en `idempotencyKey`,
+   Redis como lock de corta duración, Jest para tests.
+
+   ![spec.md generándose](docs/screenshots/01-spec-md-generado.png)
+   ![Requisitos funcionales del spec.md](docs/screenshots/02-spec-md-requisitos.png)
+
 2. **Revisión del SDD contra el challenge, antes de ejecutar nada.** Repasé
    cada requerimiento del `spec.md`/`plan.md` generado contra el PDF original
    para confirmar que no faltaba nada y que las decisiones tenían sentido,
    antes de pasar a la fase de tareas.
-3. **Cursor para revisar e implementar.** Con specs, plan y tasks ya
-   generados, entré a Cursor para revisar que todo estuviera coherente antes
-   de empezar a construir, y fue ahí donde decidí agregar una capa de
-   validación estricta que no estaba en la primera versión del plan: no
-   quería que llegaran campos no controlados en el request (`whitelist` +
-   `forbidNonWhitelisted` en el `ValidationPipe` global). Esa decisión se
-   reflejó de vuelta en `spec.md`, `plan.md` y `tasks.md` antes de seguir
-   implementando — el spec no quedó fijo desde el día uno, se ajustó cuando
-   encontré un requisito que valía la pena endurecer.
+
+3. **Ajuste del spec a mitad de camino.** Con specs, plan y tasks ya
+   generados, y revisando el código en Cursor antes de que arrancara la
+   implementación, decidí agregar una capa de validación estricta que no
+   estaba en la primera versión del plan: no quería que llegaran campos no
+   controlados en el request (`whitelist` + `forbidNonWhitelisted` en el
+   `ValidationPipe` global). Esa decisión se reflejó de vuelta en `spec.md`,
+   `plan.md` y `tasks.md` antes de seguir implementando — el spec no quedó
+   fijo desde el día uno, se ajustó cuando encontré un requisito que valía la
+   pena endurecer.
+
+   ![Decisión de agregar ValidationPipe estricto](docs/screenshots/03-decision-validation-pipe.png)
+   ![tasks.md actualizado con la nueva validación](docs/screenshots/04-tasks-actualizado.png)
+
 4. **Ejecución fase por fase**, revisando cada resultado antes de avanzar
    (bootstrap → modelos → mock del proveedor → lock de idempotencia →
    endpoint de cash-in → webhooks → observabilidad → tests → README →
    revisión final).
+
+   ![Fase 0 completada y subida a main](docs/screenshots/05-fase0-completada.png)
+   ![Validando main.ts y la app corriendo en Cursor](docs/screenshots/06-cursor-validacion-codigo.png)
 
 ### Decisiones mías, no del agente
 
